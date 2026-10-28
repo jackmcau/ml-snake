@@ -1,4 +1,5 @@
 import pygame
+import random
 from enum import Enum
 
 class gameState(Enum):
@@ -18,6 +19,7 @@ width = 15
 margin = 30
 text = pygame.font.Font(None, 36)
 state = gameState.MENU
+score = -1
 
 pygame.display.set_caption("Snake")
 
@@ -41,14 +43,29 @@ def drawMap(mapIn):
                 continue
             else:
                 # draw
+                if item == "A":
+                    screen.blit(appleImg, (column*squareWidth+margin, row*squareHeight+margin))
                 continue
 
+#Load apple.png
+squareSize = int((screen.get_width() - 2*margin) / width)
+appleImg = pygame.image.load("/Users/chaisoma/ml-snake/sprites/apple.png").convert_alpha()
+appleImg = pygame.transform.scale(appleImg, (squareSize, squareSize))
 
+def spawnApple(grid):
+    while True:
+        r = random.randrange(height)
+        c = random.randrange(width)
+        if grid[r][c] == "":               
+         grid[r][c] = "A"
 
+        global score
+        score += 1
+        return (r,c)
 
 while running:
 
-    # poll for events
+    # poll for events   
     # pygame.QUIT event means the user clicked X to close your window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -64,9 +81,11 @@ while running:
         screen.blit(play, ((screen.get_width() - play.get_width()) / 2, (screen.get_height() - play.get_height()) / 2 - 16.5))
 
         keys = pygame.mouse.get_pressed()
-        if keys[0]:
+        if keys[0] and playButton.collidepoint(pygame.mouse.get_pos()):
             print(playButton.collidepoint(pygame.mouse.get_pos()))
             state = gameState.PLAYING
+            spawnApple(map)
+           
     else:
 
         #pygame.draw.polygon(screen, pygame.Color(255,255,255), [(0, 0), (100, 0), (100, 100),(0, 100)])
@@ -86,6 +105,17 @@ while running:
 
         fps = text.render(f"{clock.get_fps():.2f} fps", True, "black")
         screen.blit(fps, (screen.get_width() / 2 - fps.get_width() / 2, screen.get_height() - fps.get_height() - 2))
+
+        scoreText = text.render(f"Score: {score}", True, "black")
+        screen.blit(scoreText, (screen.get_width() - scoreText.get_width() - 27, screen.get_height() - scoreText.get_height() - 2))
+
+     
+
+    def spawnPlayer():
+        global player_pos
+
+                
+        
 
     dt = clock.tick(60) / 1000
     # flip() the display to put your work on screen
