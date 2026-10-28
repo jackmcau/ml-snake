@@ -109,7 +109,7 @@ while running:
         scoreText = text.render(f"Score: {score}", True, "black")
         screen.blit(scoreText, (screen.get_width() - scoreText.get_width() - 27, screen.get_height() - scoreText.get_height() - 2))
 
-     
+     #Test
 
     def spawnPlayer():
         global player_pos
