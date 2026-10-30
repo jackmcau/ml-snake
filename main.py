@@ -1,3 +1,5 @@
+from typing import List
+
 import pygame
 import random
 from enum import Enum
@@ -9,42 +11,46 @@ class gameState(Enum):
     PLAYING = 1
     BOT = 2
 
+class direction(Enum):
+    North = 0
+    East = 1
+    South = 2
+    West = 3
+
 class snakeBody(Enum): # Defines drawing states for the snake, strictly for visual -- in terms of cardinal directions
-    NW = 0
+    NE = 0
     NS = 1
-    NE = 2
-    WS = 3
-    WE = 4
-    SE = 5
-
-
+    NW = 2
+    ES = 3
+    EW = 4
+    SW = 5
 
 # Pygame setup
 pygame.init()
-screen = pygame.display.set_mode((720, 720), flags=pygame.SCALED, vsync=1)
-clock = pygame.time.Clock()
-running = True
-dt = 0
+screen: pygame.Surface = pygame.display.set_mode((720, 720), flags=pygame.SCALED, vsync=1)
+clock: pygame.time.Clock = pygame.time.Clock()
+running: bool = True
+dt: float = 0
 
 # Unchanging variables
-HEIGHT = 15
-WIDTH = 15
-MARGIN = 30
-TEXT = pygame.font.Font(None, 36)
+HEIGHT: int = 15
+WIDTH: int = 15
+MARGIN: int = 30
+TEXT: pygame.font.Font = pygame.font.Font(None, 36)
 
 pygame.display.set_caption("Snake")
 
 # Game Variables
-map = [[0 for i in range(WIDTH)] for j in range(HEIGHT)]
+map: List[List[int]] = [[0 for i in range(WIDTH)] for j in range(HEIGHT)]
 for i in range(3):
     map[HEIGHT // 2][i+2] = i+1
 
-state = gameState.MENU
-score = -1
+state: gameState = gameState.MENU
+score: int = -1
 
-def drawMap(mapIn):
-    squareWidth = (screen.get_width() - (2*MARGIN))/ WIDTH
-    squareHeight = (screen.get_height() - (2*MARGIN)) / HEIGHT
+def drawMap(mapIn: List[List[int]]) -> None:
+    squareWidth: float = (screen.get_width() - (2*MARGIN))/ WIDTH
+    squareHeight: float = (screen.get_height() - (2*MARGIN)) / HEIGHT
 
     for row, content in enumerate(mapIn):
         for column, item in enumerate(content):
@@ -60,24 +66,23 @@ def drawMap(mapIn):
                 screen.blit(appleImg, (column*squareWidth+MARGIN, row*squareHeight+MARGIN))
                 continue
             else:
-                pygame.draw.polygon(screen,
-                                    pygame.Color(255, 255, 255),
-                                    [(column*squareWidth+MARGIN, row*squareHeight+MARGIN),
-                                     ((column+1)*squareWidth+MARGIN, row*squareHeight+MARGIN),
-                                     ((column+1)*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN),
-                                     (column*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN)])
+                play = TEXT.render(str(item), True, "black")
+                screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
+
+def updateMap(mapIn: List[List[int]]) -> List[List[int]]:
+    return [[0]]
                 
 #Load apple.png
-squareSize = int((screen.get_width() - 2*MARGIN) / WIDTH)
-appleImg = pygame.image.load("sprites/apple.png").convert_alpha()
+squareSize: float = int((screen.get_width() - 2*MARGIN) / WIDTH)
+appleImg: pygame.Surface = pygame.image.load("sprites/apple.png").convert_alpha()
 appleImg = pygame.transform.scale(appleImg, (squareSize, squareSize))
 
-def spawnApple(grid):
+def spawnApple(mapIn: List[List[int]]) -> tuple[int, int]:
     while True:
-        r = random.randrange(HEIGHT)
-        c = random.randrange(WIDTH)
-        if grid[r][c] == 0:               
-         grid[r][c] = -1
+        r: int = random.randrange(HEIGHT)
+        c: int = random.randrange(WIDTH)
+        if mapIn[r][c] == 0:               
+         mapIn[r][c] = -1
 
         global score
         score += 1 # I recommend we don't increment score in the apple spawning logic
@@ -128,21 +133,10 @@ while running:
 
         scoreText = TEXT.render(f"Score: {score}", True, "black")
         screen.blit(scoreText, (screen.get_width() - scoreText.get_width() - 27, screen.get_height() - scoreText.get_height() - 2))
-
-     #Test
-
-    def spawnPlayer():
-        global player_pos
-
-                
         
 
     dt = clock.tick(60) / 1000
-    # flip() the display to put your work on screen
     pygame.display.flip()
 
-    # limits FPS to 60
-    # dt is delta time in seconds since last frame, used for framerate-
-    # independent physics.
 
 pygame.quit()
