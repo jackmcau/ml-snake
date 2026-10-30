@@ -100,7 +100,7 @@ def drawMap(mapIn: List[List[int]]) -> None:
 
 def spawnApple(mapIn: List[List[int]]) -> List[List[int]]:
     zcount = sum(r.count(0) for r in mapIn)
-    placeAt = random.randrange(zcount+1)
+    placeAt = random.randrange(zcount)
     finder = 0
     for r, row in enumerate(mapIn):
         for c, v in enumerate(row):
