@@ -2,10 +2,21 @@ import pygame
 import random
 from enum import Enum
 
+# Enum definition
+
 class gameState(Enum):
     MENU = 0
     PLAYING = 1
     BOT = 2
+
+class snakeBody(Enum): # Defines drawing states for the snake, strictly for visual -- in terms of cardinal directions
+    NW = 0
+    NS = 1
+    NE = 2
+    WS = 3
+    WE = 4
+    SE = 5
+
 
 
 # Pygame setup
@@ -24,8 +35,9 @@ TEXT = pygame.font.Font(None, 36)
 pygame.display.set_caption("Snake")
 
 # Game Variables
-map = [["" for i in range(WIDTH)] for j in range(HEIGHT)]
-map[HEIGHT // 2][2:5] = "sss"
+map = [[0 for i in range(WIDTH)] for j in range(HEIGHT)]
+for i in range(3):
+    map[HEIGHT // 2][i+2] = i+1
 
 state = gameState.MENU
 score = -1
@@ -42,9 +54,9 @@ def drawMap(mapIn):
                                  ((column+1)*squareWidth+MARGIN, row*squareHeight+MARGIN),
                                  ((column+1)*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN),
                                  (column*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN)])
-            if item == "":
+            if item == 0:
                 continue
-            elif item == "A":
+            elif item == -1:
                 screen.blit(appleImg, (column*squareWidth+MARGIN, row*squareHeight+MARGIN))
                 continue
             else:
@@ -64,11 +76,11 @@ def spawnApple(grid):
     while True:
         r = random.randrange(HEIGHT)
         c = random.randrange(WIDTH)
-        if grid[r][c] == "":               
-         grid[r][c] = "A"
+        if grid[r][c] == 0:               
+         grid[r][c] = -1
 
         global score
-        score += 1
+        score += 1 # I recommend we don't increment score in the apple spawning logic
         return (r,c)
 
 while running:
