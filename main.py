@@ -52,7 +52,7 @@ for i in range(3):
     game_map[HEIGHT // 2][i+2] = i+1
 
 state: gameState = gameState.MENU
-score: int = -1
+score: int = 0
 since_last_update_ms: int = 0
 player_facing: direction = direction.East
 player_from: direction = direction.West
@@ -67,7 +67,7 @@ def resetGame(): # add any new game variables to this
     global state
     state = gameState.MENU
     global score
-    score = -1
+    score = 0
     global since_last_update_ms
     since_last_update_ms = 0
     global player_facing
