@@ -8,54 +8,62 @@ class gameState(Enum):
     BOT = 2
 
 
-# pygame setup
+# Pygame setup
 pygame.init()
 screen = pygame.display.set_mode((720, 720), flags=pygame.SCALED, vsync=1)
 clock = pygame.time.Clock()
 running = True
 dt = 0
-height = 15
-width = 15
-margin = 30
-text = pygame.font.Font(None, 36)
-state = gameState.MENU
-score = -1
+
+# Unchanging variables
+HEIGHT = 15
+WIDTH = 15
+MARGIN = 30
+TEXT = pygame.font.Font(None, 36)
 
 pygame.display.set_caption("Snake")
 
-player_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
+# Game Variables
+map = [["" for i in range(WIDTH)] for j in range(HEIGHT)]
+map[HEIGHT // 2][2:5] = "sss"
 
-map = [["" for i in range(width)] for j in range(height)]
+state = gameState.MENU
+score = -1
 
 def drawMap(mapIn):
-    squareWidth = (screen.get_width() - (2*margin))/ width
-    squareHeight = (screen.get_height() - (2*margin)) / height
+    squareWidth = (screen.get_width() - (2*MARGIN))/ WIDTH
+    squareHeight = (screen.get_height() - (2*MARGIN)) / HEIGHT
 
     for row, content in enumerate(mapIn):
         for column, item in enumerate(content):
             pygame.draw.polygon(screen,
                                 pygame.Color(0, 200+(20*((row+column) % 2)), 0),
-                                [(column*squareWidth+margin, row*squareHeight+margin),
-                                 ((column+1)*squareWidth+margin, row*squareHeight+margin),
-                                 ((column+1)*squareWidth+margin, (row+1)*squareHeight+margin),
-                                 (column*squareWidth+margin, (row+1)*squareHeight+margin)])
+                                [(column*squareWidth+MARGIN, row*squareHeight+MARGIN),
+                                 ((column+1)*squareWidth+MARGIN, row*squareHeight+MARGIN),
+                                 ((column+1)*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN),
+                                 (column*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN)])
             if item == "":
                 continue
-            else:
-                # draw
-                if item == "A":
-                    screen.blit(appleImg, (column*squareWidth+margin, row*squareHeight+margin))
+            elif item == "A":
+                screen.blit(appleImg, (column*squareWidth+MARGIN, row*squareHeight+MARGIN))
                 continue
-
+            else:
+                pygame.draw.polygon(screen,
+                                    pygame.Color(255, 255, 255),
+                                    [(column*squareWidth+MARGIN, row*squareHeight+MARGIN),
+                                     ((column+1)*squareWidth+MARGIN, row*squareHeight+MARGIN),
+                                     ((column+1)*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN),
+                                     (column*squareWidth+MARGIN, (row+1)*squareHeight+MARGIN)])
+                
 #Load apple.png
-squareSize = int((screen.get_width() - 2*margin) / width)
-appleImg = pygame.image.load("/Users/chaisoma/ml-snake/sprites/apple.png").convert_alpha()
+squareSize = int((screen.get_width() - 2*MARGIN) / WIDTH)
+appleImg = pygame.image.load("sprites/apple.png").convert_alpha()
 appleImg = pygame.transform.scale(appleImg, (squareSize, squareSize))
 
 def spawnApple(grid):
     while True:
-        r = random.randrange(height)
-        c = random.randrange(width)
+        r = random.randrange(HEIGHT)
+        c = random.randrange(WIDTH)
         if grid[r][c] == "":               
          grid[r][c] = "A"
 
@@ -77,7 +85,7 @@ while running:
 
     if state == gameState.MENU:
         playButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2-50, 100, 70))
-        play = text.render("Play", True, "black")
+        play = TEXT.render("Play", True, "black")
         screen.blit(play, ((screen.get_width() - play.get_width()) / 2, (screen.get_height() - play.get_height()) / 2 - 16.5))
 
         keys = pygame.mouse.get_pressed()
@@ -103,10 +111,10 @@ while running:
         #    player_pos.x += 300 * dt
 
 
-        fps = text.render(f"{clock.get_fps():.2f} fps", True, "black")
+        fps = TEXT.render(f"{clock.get_fps():.2f} fps", True, "black")
         screen.blit(fps, (screen.get_width() / 2 - fps.get_width() / 2, screen.get_height() - fps.get_height() - 2))
 
-        scoreText = text.render(f"Score: {score}", True, "black")
+        scoreText = TEXT.render(f"Score: {score}", True, "black")
         screen.blit(scoreText, (screen.get_width() - scoreText.get_width() - 27, screen.get_height() - scoreText.get_height() - 2))
 
      #Test
