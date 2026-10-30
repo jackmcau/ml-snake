@@ -37,7 +37,7 @@ HEIGHT: int = 15
 WIDTH: int = 15
 MARGIN: int = 30
 TEXT: pygame.font.Font = pygame.font.Font(None, 36)
-UPDATE_MS: int = 750
+UPDATE_MS: int = 350
 
 # apple.png
 SQUARE_SIZE: float = int((screen.get_width() - 2*MARGIN) / WIDTH)
@@ -98,6 +98,20 @@ def drawMap(mapIn: List[List[int]]) -> None:
                 play = TEXT.render(str(item), True, "black")
                 screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
 
+def spawnApple(mapIn: List[List[int]]) -> List[List[int]]:
+    zcount = sum(r.count(0) for r in mapIn)
+    placeAt = random.randrange(zcount+1)
+    finder = 0
+    for r, row in enumerate(mapIn):
+        for c, v in enumerate(row):
+            if v == 0:
+                if finder == placeAt:
+                    mapIn[r][c] = -1
+                    return mapIn
+                finder += 1
+    print("encountered an error with apple spawning.")
+    return mapIn # no apple was placed
+    
 def updateMap(mapIn: List[List[int]], towards: direction) -> tuple[List[List[int]], bool, bool]:
     # Returns an updated map, a bool indicating an apple was picked up, and a bool indicating if the game is over
     head_location: tuple = next(((r, c) for r, row in enumerate(mapIn) for c, val in enumerate(row) if val == player_size), (-1, -1))
@@ -107,21 +121,16 @@ def updateMap(mapIn: List[List[int]], towards: direction) -> tuple[List[List[int
     if new_head[0] >= HEIGHT or new_head[0] < 0:
         return mapIn, False, True
 
-    mapOut = [[(i-1 if i > 0 else i) for i in j] for j in mapIn]
-    mapOut[new_head[0]][new_head[1]] = player_size
-    
-    return mapOut, False, False
-
-def spawnApple(mapIn: List[List[int]]) -> tuple[int, int]:
-    while True:
-        r: int = random.randrange(HEIGHT)
-        c: int = random.randrange(WIDTH)
-        if mapIn[r][c] == 0:               
-         mapIn[r][c] = -1
-
-        global score
-        score += 1 # I recommend we don't increment score in the apple spawning logic
-        return (r,c)
+    if mapIn[new_head[0]][new_head[1]] == -1: # got apple
+        mapIn[new_head[0]][new_head[1]] = player_size + 1
+        # Spawn a new apple
+        return spawnApple(mapIn), True, False
+    elif mapIn[new_head[0]][new_head[1]] > 1:
+        return mapIn, False, True
+    else: # didnt get apple
+        mapOut = [[(i-1 if i > 0 else i) for i in j] for j in mapIn]
+        mapOut[new_head[0]][new_head[1]] = player_size
+        return mapOut, False, False
 
 while running:
 
@@ -143,7 +152,7 @@ while running:
         if keys[0] and playButton.collidepoint(pygame.mouse.get_pos()):
             print(playButton.collidepoint(pygame.mouse.get_pos()))
             state = gameState.PLAYING
-            spawnApple(game_map)
+            game_map = spawnApple(game_map)
            
     elif state == gameState.PLAYING:
 
@@ -151,25 +160,31 @@ while running:
 
         # poll for direction change
         keys = pygame.key.get_pressed()
-        if keys[pygame.key.key_code("W")]:
+        if keys[pygame.key.key_code("W")] and player_from != direction.North:
             player_facing = direction.North
-        elif keys[pygame.key.key_code("A")]:
+        elif keys[pygame.key.key_code("A")] and player_from != direction.West:
             player_facing = direction.West
-        elif keys[pygame.key.key_code("S")]:
+        elif keys[pygame.key.key_code("S")] and player_from != direction.South:
             player_facing = direction.South
-        elif keys[pygame.key.key_code("D")]:
+        elif keys[pygame.key.key_code("D")] and player_from != direction.East:
             player_facing = direction.East
 
         since_last_update_ms += dt
         if since_last_update_ms >= UPDATE_MS:
 
-            since_last_update_ms -= UPDATE_MS
+            since_last_update_ms = 0
+
+            player_from = direction((-player_facing.value[0], -player_facing.value[1]))
 
             game_map, gotApple, gameOver = updateMap(game_map, player_facing)
             if gameOver:
                 state = gameState.MENU
                 resetGame()
                 continue
+            elif gotApple:
+                print(player_from)
+                player_size += 1
+                score += 1
 
 
         drawMap(game_map)
