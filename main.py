@@ -100,7 +100,6 @@ def getSnakePart(mapIn: List[List[int]], x: int, y: int) -> tuple[pygame.Surface
     # At this point, type encodes the direction and body type of the snake
     # IF it is of the form 1010, 0101 it is straight
     # 1000, 0100, 0010, 0001 it is either a head or a tail || if map[y][x] == 1 tail
-    print(size, type)
     if size == 1:
         if mapIn[y][x] == 1:
             # tail
@@ -144,7 +143,7 @@ def drawMap(mapIn: List[List[int]]) -> None:
                 #play = TEXT.render(str(item), True, "black")
                 #screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
                 draw = getSnakePart(mapIn, column, row)
-                screen.blit(pygame.transform.rotate(draw[0], -draw[1]), (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
+                screen.blit(pygame.transform.rotate(draw[0], -draw[1]), (MARGIN + column*squareWidth, MARGIN + row*squareHeight))
 
 def spawnApple(mapIn: List[List[int]]) -> List[List[int]]:
     zcount = sum(r.count(0) for r in mapIn)
