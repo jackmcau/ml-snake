@@ -17,14 +17,6 @@ class direction(Enum):
     South = (1, 0)
     West = (0, -1)
 
-class snakeBody(Enum): # Defines drawing states for the snake, strictly for visual -- in terms of cardinal directions
-    NE = 0
-    NS = 1
-    NW = 2
-    ES = 3
-    EW = 4
-    SW = 5
-
 # Pygame setup
 pygame.init()
 screen: pygame.Surface = pygame.display.set_mode((720, 720), flags=pygame.SCALED, vsync=1)
@@ -43,6 +35,15 @@ UPDATE_MS: int = 350
 SQUARE_SIZE: float = int((screen.get_width() - 2*MARGIN) / WIDTH)
 APPLE_IMG: pygame.Surface = pygame.image.load("sprites/apple.png").convert_alpha()
 APPLE_IMG = pygame.transform.scale(APPLE_IMG, (SQUARE_SIZE, SQUARE_SIZE))
+
+HEAD_IMG: pygame.Surface = pygame.image.load("sprites/head.png").convert_alpha()
+HEAD_IMG = pygame.transform.scale(HEAD_IMG, (SQUARE_SIZE, SQUARE_SIZE))
+TAIL_IMG: pygame.Surface = pygame.image.load("sprites/tail.png").convert_alpha()
+TAIL_IMG = pygame.transform.scale(TAIL_IMG, (SQUARE_SIZE, SQUARE_SIZE))
+STRAIGHT_IMG: pygame.Surface = pygame.image.load("sprites/straight.png").convert_alpha()
+STRAIGHT_IMG = pygame.transform.scale(STRAIGHT_IMG, (SQUARE_SIZE, SQUARE_SIZE))
+ELBOW_IMG: pygame.Surface = pygame.image.load("sprites/elbow.png").convert_alpha()
+ELBOW_IMG = pygame.transform.scale(ELBOW_IMG, (SQUARE_SIZE, SQUARE_SIZE))
 
 pygame.display.set_caption("Snake")
 
@@ -77,6 +78,51 @@ def resetGame(): # add any new game variables to this
     global player_size
     player_size = 3
 
+def getSnakePart(mapIn: List[List[int]], x: int, y: int) -> tuple[pygame.Surface, int]:
+    type = 0x0 # 0000, NESW
+    size: int = 0
+    rot: int = 0
+    if y != 0 and mapIn[y-1][x] != 0 and abs(mapIn[y-1][x] - mapIn[y][x]) == 1:
+        type |= 0x8
+        size += 1
+    if x != WIDTH - 1 and mapIn[y][x+1] != 0 and abs(mapIn[y][x+1] - mapIn[y][x]) == 1:
+        type |= 0x4
+        size += 1
+        rot += 90
+    if y != HEIGHT - 1 and mapIn[y+1][x] != 0 and abs(mapIn[y+1][x] - mapIn[y][x]) == 1:
+        type |= 0x2
+        size += 1
+        rot += 180
+    if x != 0 and mapIn[y][x-1] != 0 and abs(mapIn[y][x-1] - mapIn[y][x]) == 1:
+        type |= 0x1
+        size += 1
+        rot += 270
+    # At this point, type encodes the direction and body type of the snake
+    # IF it is of the form 1010, 0101 it is straight
+    # 1000, 0100, 0010, 0001 it is either a head or a tail || if map[y][x] == 1 tail
+    print(size, type)
+    if size == 1:
+        if mapIn[y][x] == 1:
+            # tail
+            return TAIL_IMG, rot
+        else:
+            return HEAD_IMG, rot
+    if type == 10: # 1010
+        return STRAIGHT_IMG, 0
+    elif type == 5: # 0101
+        return STRAIGHT_IMG, 90
+    # 1100 12 NE, 0110 6 SE, 0011 SW 3, 1001 NW 9
+    if type == 12:
+        return ELBOW_IMG, 0
+    elif type == 6:
+        return ELBOW_IMG, 90
+    if type == 9:
+        return ELBOW_IMG, 270
+    else:
+        return ELBOW_IMG, 180
+
+    # rot is clockwise
+
 def drawMap(mapIn: List[List[int]]) -> None:
     squareWidth: float = (screen.get_width() - (2*MARGIN))/ WIDTH
     squareHeight: float = (screen.get_height() - (2*MARGIN)) / HEIGHT
@@ -95,11 +141,15 @@ def drawMap(mapIn: List[List[int]]) -> None:
                 screen.blit(APPLE_IMG, (column*squareWidth+MARGIN, row*squareHeight+MARGIN))
                 continue
             else:
-                play = TEXT.render(str(item), True, "black")
-                screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
+                #play = TEXT.render(str(item), True, "black")
+                #screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
+                draw = getSnakePart(mapIn, column, row)
+                screen.blit(pygame.transform.rotate(draw[0], -draw[1]), (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
 
 def spawnApple(mapIn: List[List[int]]) -> List[List[int]]:
     zcount = sum(r.count(0) for r in mapIn)
+    if zcount == 0:
+        return mapIn
     placeAt = random.randrange(zcount)
     finder = 0
     for r, row in enumerate(mapIn):
@@ -150,7 +200,6 @@ while running:
 
         keys = pygame.mouse.get_pressed()
         if keys[0] and playButton.collidepoint(pygame.mouse.get_pos()):
-            print(playButton.collidepoint(pygame.mouse.get_pos()))
             state = gameState.PLAYING
             game_map = spawnApple(game_map)
            
