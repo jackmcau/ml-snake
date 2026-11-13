@@ -1,7 +1,11 @@
 from typing import List
 
+from sklearn.neural_network import MLPClassifier
+
 import pygame
 import random
+import pandas as pd
+import numpy as np
 from enum import Enum
 
 # Enum definition
@@ -16,6 +20,28 @@ class direction(Enum):
     East = (0, 1)
     South = (1, 0)
     West = (0, -1)
+
+    def get_encoding(self) -> int:
+        if self.name == "North":
+            return 1
+        elif self.name == "East":
+            return 2
+        elif self.name == "South":
+            return 3
+        else:
+            return 4
+
+    @classmethod
+    def get_direction(cls, num: int):
+        if num == 1:
+            return cls.North
+        elif num == 2:
+            return cls.East
+        elif num == 3:
+            return cls.South
+        else:
+            return cls.West
+
 
 # Pygame setup
 pygame.init()
@@ -58,6 +84,10 @@ since_last_update_ms: int = 0
 player_facing: direction = direction.East
 player_from: direction = direction.West
 player_size: int = 3
+
+training_data: pd.DataFrame = pd.DataFrame()
+mlp = MLPClassifier(hidden_layer_sizes=(10,10,),
+                    max_iter=1000)
 
 def resetGame(): # add any new game variables to this
     global game_map
@@ -193,13 +223,31 @@ while running:
     screen.fill("green")
 
     if state == gameState.MENU:
-        playButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2-50, 100, 70))
+        playButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2 - 50, 100, 70))
         play = TEXT.render("Play", True, "black")
         screen.blit(play, ((screen.get_width() - play.get_width()) / 2, (screen.get_height() - play.get_height()) / 2 - 16.5))
+
+        botButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2 + 30, 100, 70))
+        bot = TEXT.render("Bot", True, "black")
+        screen.blit(bot, ((screen.get_width() - bot.get_width()) / 2, (screen.get_height() - bot.get_height()) / 2 + 63.5))
 
         keys = pygame.mouse.get_pressed()
         if keys[0] and playButton.collidepoint(pygame.mouse.get_pos()):
             state = gameState.PLAYING
+            game_map = spawnApple(game_map)
+        if keys[0] and botButton.collidepoint(pygame.mouse.get_pos()):
+            with open("playstyle.txt", mode="r", newline="", encoding="utf-8") as file:
+                reader = file.readlines()
+                reader = reader[1:]
+                for row in reader:
+                    if training_data.empty:
+                        training_data = pd.DataFrame(row.strip().split(" ")).T
+                    else:
+                        training_data.loc[len(training_data)] = row.strip().split(" ")
+
+            mlp.fit(training_data.iloc[:, :-1], training_data.iloc[:, -1])
+            print(f"accuracy: {sum(mlp.predict(training_data.iloc[:, :-1]) == training_data.iloc[:, -1]) / len(training_data)}")
+            state = gameState.BOT
             game_map = spawnApple(game_map)
            
     elif state == gameState.PLAYING:
@@ -223,6 +271,48 @@ while running:
             since_last_update_ms = 0
 
             player_from = direction((-player_facing.value[0], -player_facing.value[1]))
+            
+            with open('playstyle.txt', mode='a', newline='', encoding='utf-8') as file:
+                file.write("\n" + " ".join(np.ravel(game_map).astype(str)) + f" {player_facing.get_encoding()}")
+
+            game_map, gotApple, gameOver = updateMap(game_map, player_facing)
+            if gameOver:
+                state = gameState.MENU
+                resetGame()
+                continue
+            elif gotApple:
+                print(player_from)
+                player_size += 1
+                score += 1
+
+
+        drawMap(game_map)
+
+        fps = TEXT.render(f"{clock.get_fps():.2f} fps", True, "black")
+        screen.blit(fps, (screen.get_width() / 2 - fps.get_width() / 2, screen.get_height() - fps.get_height() - 2))
+
+        scoreText = TEXT.render(f"Score: {score}", True, "black")
+        screen.blit(scoreText, (screen.get_width() - scoreText.get_width() - 27, screen.get_height() - scoreText.get_height() - 2))
+
+
+    elif state == gameState.BOT:
+        # BOT controls must have been set up once start with bot pressed
+        dt = clock.tick(60)
+
+        since_last_update_ms += dt
+        if since_last_update_ms >= UPDATE_MS:
+
+            since_last_update_ms = 0
+
+            moveDir = direction.get_direction(mlp.predict(pd.DataFrame(np.ravel(game_map)).T)[0])
+            print(moveDir)
+            if moveDir != player_from:
+                player_facing = moveDir
+            else:
+                print("Erroneous movement")
+
+            player_from = direction((-player_facing.value[0], -player_facing.value[1]))
+            # still set player_from in case the bot makes a mistake (it happens)
 
             game_map, gotApple, gameOver = updateMap(game_map, player_facing)
             if gameOver:
