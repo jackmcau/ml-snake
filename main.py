@@ -58,7 +58,7 @@ TEXT: pygame.font.Font = pygame.font.Font(None, 36)
 UPDATE_MS: int = 50
 
 # >>> NEW: constants for the ML bot
-DATA_FILE: str = "playstyle.txt"
+DATA_FILE: str = "playstyle2.txt"
 KEEP_STRAIGHT_PROB: float = 0.3   # keep only ~30% of "went straight" rows (balances data)
 DROP_LAST_ROWS: int = 3           # drop the moves right before a crash (bad data)
 MIN_TRAIN_ROWS: int = 200         # refuse to train on too little data
