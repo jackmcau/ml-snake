@@ -4,7 +4,7 @@ from sklearn.neural_network import MLPClassifier
 
 import pygame
 import random
-import pandas as pd
+# >>> REMOVED: import pandas as pd (no longer needed)
 import numpy as np
 from enum import Enum
 
@@ -55,7 +55,14 @@ HEIGHT: int = 15
 WIDTH: int = 15
 MARGIN: int = 30
 TEXT: pygame.font.Font = pygame.font.Font(None, 36)
-UPDATE_MS: int = 350
+UPDATE_MS: int = 50
+
+# >>> NEW: constants for the ML bot
+DATA_FILE: str = "playstyle.txt"
+KEEP_STRAIGHT_PROB: float = 0.3   # keep only ~30% of "went straight" rows (balances data)
+DROP_LAST_ROWS: int = 3           # drop the moves right before a crash (bad data)
+MIN_TRAIN_ROWS: int = 200         # refuse to train on too little data
+DIRS = [direction.North, direction.East, direction.South, direction.West]
 
 # apple.png
 SQUARE_SIZE: float = int((screen.get_width() - 2*MARGIN) / WIDTH)
@@ -73,6 +80,10 @@ ELBOW_IMG = pygame.transform.scale(ELBOW_IMG, (SQUARE_SIZE, SQUARE_SIZE))
 
 pygame.display.set_caption("Snake")
 
+# >>> NEW: fixed button rects so clicks can be detected in the event loop
+playButton = pygame.Rect(screen.get_width()/2 - 50, screen.get_height()/2 - 50, 100, 70)
+botButton = pygame.Rect(screen.get_width()/2 - 50, screen.get_height()/2 + 30, 100, 70)
+
 # Game Variables
 game_map: List[List[int]] = [[0 for i in range(WIDTH)] for j in range(HEIGHT)]
 for i in range(3):
@@ -84,9 +95,11 @@ since_last_update_ms: int = 0
 player_facing: direction = direction.East
 player_from: direction = direction.West
 player_size: int = 3
+episode_rows: List[str] = []   # >>> NEW: rows from the current game, saved when it ends
 
-training_data: pd.DataFrame = pd.DataFrame()
-mlp = MLPClassifier(hidden_layer_sizes=(10,10,),
+# >>> REMOVED: training_data DataFrame
+# >>> CHANGED: hidden layers (10,10) -> (16,16)
+mlp = MLPClassifier(hidden_layer_sizes=(16, 16),
                     max_iter=1000)
 
 def resetGame(): # add any new game variables to this
@@ -107,6 +120,44 @@ def resetGame(): # add any new game variables to this
     player_from = direction.West
     global player_size
     player_size = 3
+    global episode_rows        # >>> NEW
+    episode_rows = []          # >>> NEW
+
+# >>> NEW: turns the board into 10 numbers the MLP can learn from
+def getFeatures(mapIn: List[List[int]], heading: direction) -> List[int]:
+    # 4 danger flags (N/E/S/W), 2 apple direction signs, 4 heading one-hot
+    hr, hc = next(((r, c) for r, row in enumerate(mapIn) for c, v in enumerate(row) if v == player_size), (0, 0))
+    ar, ac = next(((r, c) for r, row in enumerate(mapIn) for c, v in enumerate(row) if v == -1), (hr, hc))
+    danger = []
+    for d in DIRS:
+        r, c = hr + d.value[0], hc + d.value[1]
+        out = not (0 <= r < HEIGHT and 0 <= c < WIDTH)
+        danger.append(int(out or mapIn[r][c] > 1))
+    apple = [int(np.sign(ar - hr)), int(np.sign(ac - hc))]
+    heading_onehot = [int(d == heading) for d in DIRS]
+    return danger + apple + heading_onehot
+
+# >>> NEW: writes a finished game's rows to disk, dropping the last few if it crashed
+def saveEpisode(crashed: bool) -> None:
+    rows = episode_rows[:-DROP_LAST_ROWS] if crashed else episode_rows
+    if rows:
+        with open(DATA_FILE, mode='a', newline='', encoding='utf-8') as file:
+            file.write("\n".join(rows) + "\n")
+
+# >>> NEW: loads data, checks size, trains once, returns True if the bot is ready
+def trainBot() -> bool:
+    try:
+        data = np.loadtxt(DATA_FILE, ndmin=2)
+    except (OSError, ValueError):
+        print("No usable training data yet. Play first.")
+        return False
+    if len(data) < MIN_TRAIN_ROWS:
+        print(f"Only {len(data)} rows, need at least {MIN_TRAIN_ROWS}. Play more games.")
+        return False
+    X, y = data[:, :-1], data[:, -1].astype(int)
+    mlp.fit(X, y)
+    print(f"trained on {len(data)} rows, accuracy: {mlp.score(X, y):.2f}")
+    return True
 
 def getSnakePart(mapIn: List[List[int]], x: int, y: int) -> tuple[pygame.Surface, int]:
     type = 0x0 # 0000, NESW
@@ -170,8 +221,6 @@ def drawMap(mapIn: List[List[int]]) -> None:
                 screen.blit(APPLE_IMG, (column*squareWidth+MARGIN, row*squareHeight+MARGIN))
                 continue
             else:
-                #play = TEXT.render(str(item), True, "black")
-                #screen.blit(play, (MARGIN + column*squareWidth + (squareWidth - play.get_width()) / 2, MARGIN + row*squareHeight + (squareHeight - play.get_height()) / 2))
                 draw = getSnakePart(mapIn, column, row)
                 screen.blit(pygame.transform.rotate(draw[0], -draw[1]), (MARGIN + column*squareWidth, MARGIN + row*squareHeight))
 
@@ -190,7 +239,7 @@ def spawnApple(mapIn: List[List[int]]) -> List[List[int]]:
                 finder += 1
     print("encountered an error with apple spawning.")
     return mapIn # no apple was placed
-    
+
 def updateMap(mapIn: List[List[int]], towards: direction) -> tuple[List[List[int]], bool, bool]:
     # Returns an updated map, a bool indicating an apple was picked up, and a bool indicating if the game is over
     head_location: tuple = next(((r, c) for r, row in enumerate(mapIn) for c, val in enumerate(row) if val == player_size), (-1, -1))
@@ -213,43 +262,35 @@ def updateMap(mapIn: List[List[int]], towards: direction) -> tuple[List[List[int
 
 while running:
 
-    # poll for events   
+    # poll for events
     # pygame.QUIT event means the user clicked X to close your window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        # >>> NEW: menu clicks handled once per click (was: checked every frame in MENU)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and state == gameState.MENU:
+            if playButton.collidepoint(event.pos):
+                state = gameState.PLAYING
+                game_map = spawnApple(game_map)
+            elif botButton.collidepoint(event.pos):
+                if trainBot():
+                    state = gameState.BOT
+                    game_map = spawnApple(game_map)
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill("green")
 
     if state == gameState.MENU:
-        playButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2 - 50, 100, 70))
+        # >>> CHANGED: buttons only drawn here; click logic moved to the event loop above
+        pygame.draw.rect(screen, "gray", playButton)
         play = TEXT.render("Play", True, "black")
         screen.blit(play, ((screen.get_width() - play.get_width()) / 2, (screen.get_height() - play.get_height()) / 2 - 16.5))
 
-        botButton = pygame.draw.rect(screen, "gray", (screen.get_width()/2-50, screen.get_height()/2 + 30, 100, 70))
+        pygame.draw.rect(screen, "gray", botButton)
         bot = TEXT.render("Bot", True, "black")
         screen.blit(bot, ((screen.get_width() - bot.get_width()) / 2, (screen.get_height() - bot.get_height()) / 2 + 63.5))
+        # >>> REMOVED: old held-mouse check and pandas training loop (replaced by trainBot())
 
-        keys = pygame.mouse.get_pressed()
-        if keys[0] and playButton.collidepoint(pygame.mouse.get_pos()):
-            state = gameState.PLAYING
-            game_map = spawnApple(game_map)
-        if keys[0] and botButton.collidepoint(pygame.mouse.get_pos()):
-            with open("playstyle.txt", mode="r", newline="", encoding="utf-8") as file:
-                reader = file.readlines()
-                reader = reader[1:]
-                for row in reader:
-                    if training_data.empty:
-                        training_data = pd.DataFrame(row.strip().split(" ")).T
-                    else:
-                        training_data.loc[len(training_data)] = row.strip().split(" ")
-
-            mlp.fit(training_data.iloc[:, :-1], training_data.iloc[:, -1])
-            print(f"accuracy: {sum(mlp.predict(training_data.iloc[:, :-1]) == training_data.iloc[:, -1]) / len(training_data)}")
-            state = gameState.BOT
-            game_map = spawnApple(game_map)
-           
     elif state == gameState.PLAYING:
 
         dt = clock.tick(60)
@@ -270,18 +311,24 @@ while running:
 
             since_last_update_ms = 0
 
+            # >>> NEW: heading BEFORE this move. Features use it, the label is the move you chose.
+            prev_heading = direction((-player_from.value[0], -player_from.value[1]))
+            turned = player_facing != prev_heading
+
+            # >>> CHANGED: log features (not the raw map); keep all turns, some straight rows
+            if turned or random.random() < KEEP_STRAIGHT_PROB:
+                feats = getFeatures(game_map, prev_heading)
+                episode_rows.append(" ".join(map(str, feats)) + f" {player_facing.get_encoding()}")
+
             player_from = direction((-player_facing.value[0], -player_facing.value[1]))
-            
-            with open('playstyle.txt', mode='a', newline='', encoding='utf-8') as file:
-                file.write("\n" + " ".join(np.ravel(game_map).astype(str)) + f" {player_facing.get_encoding()}")
 
             game_map, gotApple, gameOver = updateMap(game_map, player_facing)
             if gameOver:
+                saveEpisode(crashed=True)   # >>> NEW
                 state = gameState.MENU
                 resetGame()
                 continue
             elif gotApple:
-                print(player_from)
                 player_size += 1
                 score += 1
 
@@ -296,7 +343,6 @@ while running:
 
 
     elif state == gameState.BOT:
-        # BOT controls must have been set up once start with bot pressed
         dt = clock.tick(60)
 
         since_last_update_ms += dt
@@ -304,23 +350,22 @@ while running:
 
             since_last_update_ms = 0
 
-            moveDir = direction.get_direction(mlp.predict(pd.DataFrame(np.ravel(game_map)).T)[0])
-            print(moveDir)
+            # >>> CHANGED: predict from features + current heading (was: raw flattened map)
+            pred = mlp.predict([getFeatures(game_map, player_facing)])[0]
+            moveDir = direction.get_direction(pred)
             if moveDir != player_from:
                 player_facing = moveDir
-            else:
-                print("Erroneous movement")
+            # else: bot tried to reverse, keep going the same way
 
             player_from = direction((-player_facing.value[0], -player_facing.value[1]))
-            # still set player_from in case the bot makes a mistake (it happens)
 
             game_map, gotApple, gameOver = updateMap(game_map, player_facing)
             if gameOver:
+                print(f"Bot final score: {score}")   # >>> NEW
                 state = gameState.MENU
                 resetGame()
                 continue
             elif gotApple:
-                print(player_from)
                 player_size += 1
                 score += 1
 
