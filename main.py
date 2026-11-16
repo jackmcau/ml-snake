@@ -127,15 +127,36 @@ def resetGame(): # add any new game variables to this
 def getFeatures(mapIn: List[List[int]], heading: direction) -> List[int]:
     # 4 danger flags (N/E/S/W), 2 apple direction signs, 4 heading one-hot
     hr, hc = next(((r, c) for r, row in enumerate(mapIn) for c, v in enumerate(row) if v == player_size), (0, 0))
+    # hr, hc == coords of player head
     ar, ac = next(((r, c) for r, row in enumerate(mapIn) for c, v in enumerate(row) if v == -1), (hr, hc))
+    # ar, ac == apple coords
     danger = []
-    for d in DIRS:
+    for d in DIRS: # dirs contains all cardinal directions as "direction" data type
         r, c = hr + d.value[0], hc + d.value[1]
+        # r, c initialized to the location in the direction of d
         out = not (0 <= r < HEIGHT and 0 <= c < WIDTH)
+        # out is initialized to 1 if there is "danger" in direction (death), 0 otherwise, aka out of bounds check
         danger.append(int(out or mapIn[r][c] > 1))
+        # danger ends up as a length 4 list, 1 if there is danger in the direction 0 if it is free to move in
     apple = [int(np.sign(ar - hr)), int(np.sign(ac - hc))]
+    # apple direction as list [row, column], either -1, 0, or 1 depending on where apple is located relative to player
     heading_onehot = [int(d == heading) for d in DIRS]
+    # heading as onehot encoding
+
     return danger + apple + heading_onehot
+    # list of training parameters
+    # This will fail sometimes because the snake might think it is free to move in a direction but will trap itself,
+    # consider the board
+    # 0 > - v
+    # a ^ 0 h
+    # 0 ^ < 0
+    # 0 0 ^ -
+    #
+    # - > v ^ all refer to directions and h is the head, a is the apple
+    # Clearly to us, you need to go down because you will become trapped if you go left and going down is the
+    # best option.
+    # To the bot, it can not forsee this failure and will just go towards the apple since even with the perfect
+    # playing data, this information will make left the optimal move.
 
 # >>> NEW: writes a finished game's rows to disk, dropping the last few if it crashed
 def saveEpisode(crashed: bool) -> None:
